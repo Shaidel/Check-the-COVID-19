@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 import pandas as pd
+import math
 import matplotlib.pyplot as plt
+from matplotlib import pyplot
 from pandas.plotting import register_matplotlib_converters
 import os
 import tkinter as tk
 from PIL import ImageTk, Image
+import numpy as np
 """
 Created on Sat Mar 21 20:53:24 2020
 
@@ -66,16 +69,27 @@ def retrieve_index(region):
     return certain_data.loc[region].index[3:]
 
 
+def convert_data_to_daily_cases(all_data):
+    converted_data = dict()
+    for key in all_data:
+        daily_cases = [0]
+        data_entry = all_data[key]
+        for i in range(1, len(data_entry)):
+            daily_cases.append(abs(data_entry[i] - data_entry[i-1]))
+
+        converted_data[key] = daily_cases
+    return converted_data
+
 def SUBMIT():
     values = name.get()
     all_data = dict()
     try:
-        if var_confirmed.get() == 1:
-            all_data['Confirmed'] = retrieve_data("Confirmed", values)
         if var_deaths.get() == 1:
             all_data['Deaths'] = retrieve_data("Deaths", values)
         if var_recoveries.get() == 1:
             all_data['Recoveries'] = retrieve_data("Recoveries", values)
+        if var_confirmed.get() == 1:
+            all_data['Confirmed'] = retrieve_data("Confirmed", values)
     except KeyError:
         tk.messagebox.showerror(title='Error', message="There's not country like: '"+values+"'!")
         return
@@ -84,13 +98,37 @@ def SUBMIT():
         tk.messagebox.showerror(title='Error', message='No selected data!')
         return
 
-    df = pd.DataFrame(all_data, index=retrieve_index(values))
-    df.plot(figsize=(12, 8), title='COVID-19 in ' + values)
+    if var_daily.get() == 1:
+        daily_cases = convert_data_to_daily_cases(all_data)
+        index_values = retrieve_index(values)
+        less_labels = []
+        for i in range(0, len(index_values)):
+            if i % 5 == 0:
+                less_labels.append(index_values[i])
+            else:
+                less_labels.append('')
+        # df = pd.DataFrame(, index=index_values)
+        # df_sum = df.sum(numeric_only=True)
+        ax = plt.axes()
+        ax.xaxis.set_minor_locator(plt.MaxNLocator(len(index_values)/10))
+        plt.xticks(range(0, len(index_values)), less_labels, rotation=45)
+
+        if var_deaths.get() == 1:
+            plt.bar(index_values, daily_cases["Confirmed"])
+        if var_recoveries.get() == 1:
+            plt.bar(index_values, daily_cases["Recoveries"])
+        if var_confirmed.get() == 1:
+            plt.bar(index_values, daily_cases["Deaths"])
+
+    else:
+        df = pd.DataFrame(all_data, index=retrieve_index(values))
+        df.plot(figsize=(12, 8), title='COVID-19 in ' + values)
 
     plt.savefig("images/chart.png")
     img2 = ImageTk.PhotoImage(Image.open("images/chart.png"))
     panel.configure(image=img2)
     panel.image = img2
+    plt.clf()
 
 
 window = tk.Tk()
@@ -114,10 +152,11 @@ name.pack()
 var_confirmed = tk.IntVar()
 var_deaths = tk.IntVar()
 var_recoveries = tk.IntVar()
+var_daily = tk.IntVar()
 
 
 def data_type_button(name_tag, variable):
-    button = tk.Checkbutton(window, text=name_tag, variable=variable, command=lambda: 1)
+    button = tk.Checkbutton(window, text=name_tag, variable=variable, command=lambda: 1 if variable == 0 else 1)
     button.pack()
     button.select()
 
@@ -125,6 +164,7 @@ def data_type_button(name_tag, variable):
 data_type_button("Confirmed Cases", var_confirmed)
 data_type_button("Deaths", var_deaths)
 data_type_button("Recoveries", var_recoveries)
+data_type_button("Daily", var_daily)
 
 ok = tk.Button(window, text="OK", width=20, command=SUBMIT)
 ok.pack()
